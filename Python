@@ -1,0 +1,175 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load dataset
+df = pd.read_excel('../dataset/instamart_orders.xlsx')
+
+# Display first rows
+print("\nFIRST 5 ROWS:")
+print(df.head())
+
+# Dataset info
+print("\nDATASET INFO:")
+print(df.info())
+
+# Missing values
+print("\nMISSING VALUES:")
+print(df.isnull().sum())
+
+# Basic statistics
+print("\nSTATISTICAL SUMMARY:")
+print(df.describe())
+
+# Total revenue
+total_revenue = df['Revenue'].sum()
+print("\nTOTAL REVENUE:", round(total_revenue, 2))
+
+# Average delivery time
+avg_delivery = df['Delivery_Time_Minutes'].mean()
+print("AVERAGE DELIVERY TIME:", round(avg_delivery, 2))
+
+# Top cities by revenue
+city_revenue = df.groupby('City')['Revenue'].sum().sort_values(ascending=False)
+
+print("\nTOP CITIES BY REVENUE:")
+print(city_revenue)
+
+# Correlation matrix
+numeric_df = df.select_dtypes(include=np.number)
+
+plt.figure(figsize=(12,8))
+sns.heatmap(numeric_df.corr(), annot=True, cmap='coolwarm')
+
+plt.title('Correlation Heatmap')
+
+plt.show()
+
+# Top product categories
+plt.figure(figsize=(10,6))
+
+df.groupby('Product_Category')['Revenue'].sum().sort_values().plot(kind='barh')
+
+plt.title('Revenue by Product Category')
+plt.xlabel('Revenue')
+plt.ylabel('Category')
+
+plt.show()
+
+# Delivery status distribution
+plt.figure(figsize=(8,5))
+
+df['Delivery_Status'].value_counts().plot(kind='pie', autopct='%1.1f%%')
+
+plt.title('Delivery Status Distribution')
+
+plt.ylabel('')
+plt.savefig('../images/heatmap.png', dpi=300, bbox_inches='tight')
+
+plt.show()
+
+
+from sklearn.linear_model import LinearRegression
+
+# Convert Order_Date to datetime
+df['Order_Date'] = pd.to_datetime(df['Order_Date'])
+
+# Daily revenue
+daily_sales = df.groupby('Order_Date')['Revenue'].sum().reset_index()
+
+# Create day number
+daily_sales['Day_Number'] = np.arange(len(daily_sales))
+
+# Features and target
+X = daily_sales[['Day_Number']]
+y = daily_sales['Revenue']
+
+# Train model
+model = LinearRegression()
+model.fit(X, y)
+
+# Predict future 15 days
+future_days = np.arange(len(daily_sales), len(daily_sales) + 15).reshape(-1,1)
+
+future_predictions = model.predict(future_days)
+
+# Future dates
+future_dates = pd.date_range(
+    start=daily_sales['Order_Date'].max() + pd.Timedelta(days=1),
+    periods=15
+)
+
+# Forecast dataframe
+forecast_df = pd.DataFrame({
+    'Date': future_dates,
+    'Predicted_Revenue': future_predictions
+})
+
+print("\nFUTURE SALES FORECAST:")
+print(forecast_df)
+
+# Visualization
+plt.figure(figsize=(12,6))
+
+plt.plot(
+    daily_sales['Order_Date'],
+    daily_sales['Revenue'],
+    label='Actual Revenue'
+)
+
+plt.plot(
+    forecast_df['Date'],
+    forecast_df['Predicted_Revenue'],
+    label='Forecasted Revenue'
+)
+
+plt.title('Revenue Forecasting')
+
+plt.xlabel('Date')
+plt.ylabel('Revenue')
+
+plt.legend()
+plt.savefig('../images/forecast.png', dpi=300, bbox_inches='tight')
+
+plt.show()
+
+from textblob import TextBlob
+
+# Sentiment analysis function
+def get_sentiment(text):
+    analysis = TextBlob(text)
+
+    if analysis.sentiment.polarity > 0:
+        return 'Positive'
+
+    elif analysis.sentiment.polarity < 0:
+        return 'Negative'
+
+    else:
+        return 'Neutral'
+
+# Apply sentiment analysis
+df['Sentiment'] = df['Customer_Review'].apply(get_sentiment)
+
+# Sentiment counts
+print("\nSENTIMENT ANALYSIS:")
+print(df['Sentiment'].value_counts())
+
+# Sentiment visualization
+plt.figure(figsize=(8,5))
+
+df['Sentiment'].value_counts().plot(
+    kind='bar'
+)
+
+plt.title('Customer Sentiment Analysis')
+
+plt.xlabel('Sentiment')
+plt.ylabel('Count')
+plt.savefig('../images/sentiment_analysis.png', dpi=300, bbox_inches='tight')
+
+plt.show()
+forecast_df.to_csv("forecast_output.csv", index=False)
+
+print("Forecast CSV exported successfully!")
